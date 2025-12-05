@@ -1,9 +1,12 @@
+export interface Profile {
+  username: string;
+  avatar_url: string | null;
+}
+
 export interface Post {
   id: number | string;
-  user?: {
-    username: string;
-    avatar: string;
-  };
+  user_id: string;
+  profile?: Profile;
   image_url: string;
   caption: string;
   likes: number;

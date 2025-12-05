@@ -15,6 +15,9 @@ function Modal({
   post: Post;
   onClose: () => void;
 }) {
+  const username = post.profile?.username || "default_user";
+  const avatarUrl = post.profile?.avatar_url;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
@@ -48,16 +51,22 @@ function Modal({
 
         {/* Header con usuario */}
         <div className="flex items-center gap-3 p-4 border-b border-border">
-          <div className="relative w-10 h-10 rounded-full overflow-hidden ring-2 ring-primary">
-            <Image
-              src={post.user?.avatar || "https://xynshcnkxdliapebmyaz.supabase.co/storage/v1/object/public/images/posts/unnamed-14.jpg"}
-              alt={post.user?.username || "default_user"}
-              fill
-              className="object-cover"
-            />
+          <div className="relative w-10 h-10 rounded-full overflow-hidden ring-2 ring-primary bg-card-bg">
+            {avatarUrl ? (
+              <Image
+                src={avatarUrl}
+                alt={username}
+                fill
+                className="object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-lg text-foreground/40">
+                {username.charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
           <div className="flex flex-col">
-            <span className="font-semibold text-foreground">{post.user?.username || "default_user"}</span>
+            <span className="font-semibold text-foreground">@{username}</span>
             <span className="text-xs text-foreground/50">{getTimeAgo(new Date(post.created_at))}</span>
           </div>
         </div>
@@ -66,7 +75,7 @@ function Modal({
         <div className="relative w-full aspect-square">
           <Image
             src={post.image_url}
-            alt={`Post de ${post.user?.username || "default_user"}`}
+            alt={`Post de ${username}`}
             fill
             className="object-cover"
           />
@@ -81,7 +90,7 @@ function Modal({
             </span>
           </div>
           <p className="mt-2 text-foreground">
-            <span className="font-semibold">{post.user?.username || "default_user"}</span>{" "}
+            <span className="font-semibold">@{username}</span>{" "}
             <span className="text-foreground/80">{post.caption}</span>
           </p>
         </div>
@@ -97,18 +106,39 @@ export default function RankPage() {
 
   useEffect(() => {
     const fetchPosts = async () => {
-      const { data, error } = await supabase
+      // 1. Obtener posts
+      const { data: postsData, error: postsError } = await supabase
         .from("posts_new")
         .select("id, image_url, caption, likes, user_id, created_at")
         .gt("likes", 5)
-        .order("likes", { ascending: false })
+        .order("likes", { ascending: false });
 
-      if (error) {
-        console.error("Error al obtener los posts:", error);
-      } else {
-        console.log("Posts obtenidos:", data);
-        setPosts(data);
+      if (postsError) {
+        console.error("Error al obtener los posts:", postsError);
+        return;
       }
+
+      // 2. Obtener IDs únicos de usuarios
+      const userIds = [...new Set(postsData.map((p) => p.user_id))];
+
+      // 3. Buscar profiles de esos usuarios
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url")
+        .in("id", userIds);
+
+      // 4. Crear mapa de profiles por ID
+      const profilesMap = new Map(
+        profilesData?.map((p) => [p.id, { username: p.username, avatar_url: p.avatar_url }]) || []
+      );
+
+      // 5. Combinar posts con profiles
+      const postsWithProfiles = postsData.map((post) => ({
+        ...post,
+        profile: profilesMap.get(post.user_id),
+      }));
+
+      setPosts(postsWithProfiles);
     };
 
     fetchPosts();
