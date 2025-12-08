@@ -64,6 +64,9 @@ export default function Home() {
   const handleComment = async (postId: number | string, body: string) => {
     if (!currentUserId) return;
 
+    const post = posts.find((p) => p.id === postId);
+    if (!post) return;
+
     const { data, error } = await supabase
       .from("comments")
       .insert({ user_id: currentUserId, post_id: postId, body })
@@ -71,8 +74,8 @@ export default function Home() {
       .single();
 
     if (!error && data) {
-      // Obtener profile del usuario actual
-      const { data: profileData } = await supabase
+      // Obtener profile del usuario actual (comentador)
+      const { data: commenterProfile } = await supabase
         .from("profiles")
         .select("username, avatar_url")
         .eq("id", currentUserId)
@@ -80,7 +83,7 @@ export default function Home() {
 
       const newComment: Comment = {
         ...data,
-        profile: profileData || undefined,
+        profile: commenterProfile || undefined,
       };
 
       setPosts((prev) =>
@@ -90,6 +93,21 @@ export default function Home() {
             : p
         )
       );
+
+      // Enviar email al titular del post (si no es el mismo usuario)
+      if (post.user_id !== currentUserId) {
+        fetch("/api/send-comment-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            postOwnerId: post.user_id,
+            ownerUsername: post.profile?.username || "Usuario",
+            commenterUsername: commenterProfile?.username || "Alguien",
+            commentBody: body,
+            postCaption: post.caption,
+          }),
+        }).catch((err) => console.error("Error enviando email:", err));
+      }
     }
   };
 
