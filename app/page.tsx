@@ -60,7 +60,7 @@ export default function Home() {
 
         // Crear notificación via Edge Function
         if (post.user_id !== currentUserId) {
-          supabase.functions.invoke("create-notification", {
+          supabase.functions.invoke("send-notification", {
             body: {
               type: "like",
               post_id: postId,
@@ -110,7 +110,7 @@ export default function Home() {
       // Notificar al titular del post (si no es el mismo usuario)
       if (post.user_id !== currentUserId) {
         // Crear notificación via Edge Function
-        supabase.functions.invoke("create-notification", {
+        supabase.functions.invoke("send-notification", {
           body: {
             type: "comment",
             post_id: postId,
