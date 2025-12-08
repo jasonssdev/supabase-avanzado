@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Post, Comment } from "./types";
 import { supabase } from "./lib/client";
 import { PostCard } from "./components/PostCard";
+import { NotificationBell } from "./components/NotificationBell";
 
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -56,6 +57,18 @@ export default function Home() {
               : p
           )
         );
+
+        // Crear notificación via Edge Function
+        if (post.user_id !== currentUserId) {
+          supabase.functions.invoke("create-notification", {
+            body: {
+              type: "like",
+              post_id: postId,
+              actor_id: currentUserId,
+              post_owner_id: post.user_id,
+            },
+          });
+        }
       }
     }
   };
@@ -94,8 +107,20 @@ export default function Home() {
         )
       );
 
-      // Enviar email al titular del post (si no es el mismo usuario)
+      // Notificar al titular del post (si no es el mismo usuario)
       if (post.user_id !== currentUserId) {
+        // Crear notificación via Edge Function
+        supabase.functions.invoke("create-notification", {
+          body: {
+            type: "comment",
+            post_id: postId,
+            actor_id: currentUserId,
+            post_owner_id: post.user_id,
+            comment_body: body,
+          },
+        });
+
+        // Enviar email
         fetch("/api/send-comment-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -210,10 +235,12 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-card-bg border-b border-border">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-center">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="w-10"></div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             Suplatzigram
           </h1>
+          <NotificationBell />
         </div>
       </header>
 
